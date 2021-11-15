@@ -30,7 +30,6 @@ This implies that if the sender does not `set_error(exc_ptr);`, the receiver wil
 power features as coroutines, but it does not require them. When combined with (4), it forms an interesting
 value proposition for those who write their C++ code without exceptions.
 
-
 ## 1. Exceptions should not be propagated from receiver to sender.
 
 Consider the following implementation of a trivial `just_void` sender. Its only duty is to send `(void)` value
@@ -170,3 +169,21 @@ their presence.
 
 ## 5. Unifex glue can be implemented `noexcept`.
 
+`unifex::set_value(rec, s1, ..., sN)` always sits between sender and receiver's `set_value(r1, ..., rN)`.
+I use different letters to designate that a type conversion `typeof(sK) -> typeof(rK)` happens in between.
+
+I think we should have two policies:
+
+1. If we require that all such implicit conversions from `s1, ..., sN` to `r1, ... rN` are non-throwing.
+
+2. We can also either require that destructors of `r1.~R1(), ..., rN.~RN()` are non-throwing, or guard them
+with `std::terminate()`. In the section 2 above I argue that there is no good way to handle throwing 
+destructors - both sender and receiver have fully finished their execution by that moment, and the operation 
+state might even be already destroyed.
+
+There is also an option to enforce passing references to non-temporary objects (stored in operation state)
+instead of values, but I don't really like it. It narrows down policy (1) above to a particular kind of
+implicit conversions (too narrow, I think; e.g. `short -> int` is non-throwing and is always possible
+whereas `short& -> int&` - not). It also does not save from the problem of temporaries destruction, but
+simply moves it to another point during the execution - the op-state destruction. And there is no good
+way to handle throwing destructors during op-state destruction either.
